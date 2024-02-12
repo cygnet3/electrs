@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use bitcoin::consensus::{deserialize, serialize, Decodable};
+use bitcoin::hex::DisplayHex;
 use bitcoin::secp256k1::PublicKey;
 use bitcoin::{BlockHash, OutPoint, Txid};
 use bitcoin_slices::{bsl, Visit, Visitor};
@@ -166,6 +167,21 @@ impl Index {
             .iter_spending(SpendingPrefixRow::scan_prefix(outpoint))
             .map(|row| HashPrefixRow::from_db_row(&row).height())
             .filter_map(move |height| self.chain.get_block_hash(height))
+    }
+
+    pub(crate) fn get_tweaks(&self, height: u64) -> impl Iterator<Item = (u64, Vec<String>)> + '_ {
+        self.store
+            .read_tweaks(height)
+            .into_iter()
+            .filter_map(move |(block_height, tweaks)| {
+                assert!(tweaks.len() % 33 == 0 && tweaks.len() > 0);
+                assert!(block_height.len() == 8);
+
+                let tweak_row_block_height = u64::from_be_bytes(block_height[..].try_into().unwrap());
+                let pks = tweaks.chunks(33).map(|x| format!("{}", x.as_hex())).collect();
+
+                Some((tweak_row_block_height, pks))
+            })
     }
 
     pub(crate) fn silent_payments_sync(
