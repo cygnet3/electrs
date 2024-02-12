@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use anyhow::{Context, Result};
-use bitcoin::{BlockHash, Transaction, Txid};
+use bitcoin::{secp256k1::PublicKey, BlockHash, Transaction, Txid};
 use bitcoin_slices::{
     bsl::{self, FindTransaction},
     Error::VisitBreak,
@@ -124,5 +126,14 @@ impl Tracker {
             };
         })?;
         Ok(result)
+    }
+
+    pub(crate) fn get_tweaks(&self, height: usize) -> Result<HashMap<u32, Vec<PublicKey>>> {
+        let tweaks: Vec<(u32, Vec<PublicKey>)> = self.index.get_tweaks(height).collect();
+        let mut res: HashMap<u32, Vec<PublicKey>> = HashMap::new();
+        for (height, tweaks) in tweaks {
+            res.entry(height).or_insert_with(Vec::new).extend(tweaks)
+        }
+        Ok(res)
     }
 }

@@ -168,6 +168,27 @@ impl Index {
             .filter_map(move |height| self.chain.get_block_hash(height))
     }
 
+    pub(crate) fn get_tweaks(&self, height: usize) -> impl Iterator<Item = (u32, Vec<PublicKey>)> + '_ {
+        self.store
+            .read_tweaks()
+            .into_iter()
+            .filter_map(move |(block_hash, tweaks)| {
+
+                let block_hash = BlockHash::from_slice(&block_hash).unwrap();
+
+                // Stored in hashmap so not costly
+                let tweak_row_height = self.chain.get_block_height(&block_hash).unwrap();
+
+                if tweak_row_height >= height && tweaks.len() > 0 {
+                    assert!(tweaks.len() % 33 == 0);
+                    let pks = tweaks.chunks(33).map(|x| PublicKey::from_slice(x).unwrap()).collect();
+                    Some((tweak_row_height as u32, pks))
+                } else {
+                    None
+                }
+            })
+    }
+
     pub(crate) fn silent_payments_sync(
         &mut self,
         daemon: &Daemon,
